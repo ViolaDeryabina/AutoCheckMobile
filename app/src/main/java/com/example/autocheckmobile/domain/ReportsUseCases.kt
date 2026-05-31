@@ -1,26 +1,20 @@
 package com.example.autocheckmobile.domain
 
+import com.example.autocheckmobile.data.remote.AppReportsRepository
 import com.example.netlib.data.dto.ApiResponse
-import com.example.netlib.data.dto.HealthResponse
 import com.example.netlib.data.dto.ReportsStatsData
 import com.example.netlib.data.result.NetworkResult
-import com.example.netlib.domain.repository.ReportsRepository
 import javax.inject.Inject
 
-// Получение статистики
 class GetStatsUseCase @Inject constructor(
-    private val repository: ReportsRepository
+    private val repository: AppReportsRepository,
 ) {
-    suspend operator fun invoke(token: String): NetworkResult<ApiResponse<ReportsStatsData>> {
-        return repository.getStats(token)
-    }
+    suspend operator fun invoke(token: String): NetworkResult<ApiResponse<ReportsStatsData>> =
+        repository.getStats(token)
 }
 
-// Проверка здоровья сервера
-class HealthCheckUseCase @Inject constructor(
-    private val repository: ReportsRepository
-) {
-    suspend operator fun invoke(): NetworkResult<HealthResponse> {
-        return repository.healthCheck()
-    }
+// Оставлен для совместимости с HealthViewModel (не используется в навигации).
+class HealthCheckUseCase @Inject constructor() {
+    suspend operator fun invoke(): NetworkResult<com.example.netlib.data.dto.HealthResponse> =
+        NetworkResult.Exception("Health check не настроен")
 }

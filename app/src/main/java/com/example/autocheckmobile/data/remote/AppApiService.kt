@@ -4,7 +4,6 @@ import com.example.netlib.data.dto.ApiResponse
 import com.example.netlib.data.dto.CandidateResponse
 import com.example.netlib.data.dto.CandidatesData
 import com.example.netlib.data.dto.ReportsStatsData
-import com.example.netlib.data.dto.sub.AiReviewResponse
 import com.example.netlib.data.dto.sub.SubmissionResponse
 import com.example.netlib.data.dto.sub.SubmissionStatusResponse
 import com.example.netlib.data.dto.sub.SubmissionsData
@@ -82,7 +81,7 @@ interface AppApiService {
     suspend fun getAiReview(
         @Header("Authorization") token: String,
         @Path("submission_id") submissionId: Int,
-    ): ApiResponse<AiReviewResponse>
+    ): ApiResponse<AiReviewApiData>
 
     @GET("v1/candidates")
     suspend fun listCandidates(@Header("Authorization") token: String): ApiResponse<CandidatesData>

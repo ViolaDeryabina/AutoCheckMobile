@@ -78,7 +78,12 @@ class SubmissionDetailsViewModel @Inject constructor(
                 is NetworkResult.Success -> {
                     val review = result.data.data
                     if (activeSubmissionId == submissionId) {
-                        _state.value = _state.value.copy(aiReview = review, aiUnavailable = review == null)
+                        val unavailable = review.review.isNullOrBlank() &&
+                            review.suggestions.isNullOrEmpty()
+                        _state.value = _state.value.copy(
+                            aiReview = if (unavailable) null else review,
+                            aiUnavailable = unavailable,
+                        )
                     }
                 }
                 else -> {

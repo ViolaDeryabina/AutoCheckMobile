@@ -126,6 +126,30 @@ fun DashBoard(modifier: Modifier = Modifier) {
 
                 }
             )
+            Space24H()
+            MainCard(
+                modifier = Modifier.fillMaxWidth(),
+                content = {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column() {
+                            Text(
+                                text = "УСПЕШНОСТЬ",
+                                color = LightGrayBlue,
+                                style = CustomTheme.typography.geistSemiBold12
+                            )
+                            Text(
+                                text = "+12.5% за неделю",
+                                color = MintGreen,
+                                style = CustomTheme.typography.geistSemiBold12
+                            )
+                        }
+                    }
+
+                }
+            )
 
         }
     }

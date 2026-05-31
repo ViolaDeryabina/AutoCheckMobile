@@ -31,6 +31,7 @@ fun PrimaryButton(
     variant: ButtonVariant = ButtonVariant.Primary,
     enabled: Boolean = true,
     loading: Boolean = false,
+    fillMaxWidth: Boolean = true,
 ) {
     Log.d("[PrimaryButton]", "Отрисовка — text=$text loading=$loading")
     val colors = when (variant) {
@@ -51,7 +52,7 @@ fun PrimaryButton(
     if (variant == ButtonVariant.Secondary) {
         OutlinedButton(
             onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
+            modifier = if (fillMaxWidth) modifier.fillMaxWidth() else modifier,
             enabled = enabled && !loading,
             colors = colors,
             border = ButtonDefaults.outlinedButtonBorder.copy(
@@ -63,7 +64,7 @@ fun PrimaryButton(
     } else {
         Button(
             onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
+            modifier = if (fillMaxWidth) modifier.fillMaxWidth() else modifier,
             enabled = enabled && !loading,
             colors = colors,
             shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignTokens.RadiusSm),

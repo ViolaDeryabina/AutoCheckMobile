@@ -3,6 +3,7 @@ package com.example.autocheckmobile.presentation.screens
 import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,8 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,9 +24,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import com.example.autocheckmobile.presentation.components.CandidateAvatar
 import com.example.autocheckmobile.presentation.components.CircleWithGradient
 import com.example.autocheckmobile.presentation.components.MainCard
+import com.example.autocheckmobile.presentation.components.PrimaryButton
 import com.example.autocheckmobile.presentation.components.StatusBadge
+import com.example.autocheckmobile.presentation.components.ButtonVariant
 import com.example.autocheckmobile.presentation.theme.CustomTheme
 import com.example.autocheckmobile.presentation.theme.DesignTokens
 import com.example.autocheckmobile.presentation.theme.Dimens
@@ -33,12 +37,13 @@ import com.example.autocheckmobile.presentation.theme.MintGreen
 import com.example.autocheckmobile.presentation.theme.Space12H
 import com.example.autocheckmobile.presentation.theme.Space16H
 import com.example.autocheckmobile.presentation.theme.Space24H
+import com.example.autocheckmobile.shared.DateFormatter
 import com.example.netlib.data.dto.DailyStats
 import com.example.netlib.data.dto.ReportsStatsData
 import com.example.netlib.data.dto.sub.SubmissionItem
 
 /**
- * Назначение: главный дашборд эксперта — метрики, срочные проверки, график активности.
+ * Назначение: главный дашборд эксперта — метрики, срочные проверки, активность, недавние события.
  * Дата создания: 31-05-2026
  * Автор создания: Команда AutoCheck
  */
@@ -47,6 +52,9 @@ fun DashBoard(
     userName: String,
     stats: ReportsStatsData?,
     submissions: List<SubmissionItem>,
+    candidateName: (Int) -> String,
+    onOpenSubmission: (Int) -> Unit,
+    onOpenStats: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Log.i("[DashBoard]", "Отрисовка — user=$userName")
@@ -54,7 +62,15 @@ fun DashBoard(
     val totalTests = stats?.totalSubmissions ?: submissions.size
     val passRate = stats?.let {
         if (it.totalSubmissions == 0) 0 else (it.approvedCount * 100 / it.totalSubmissions)
-    } ?: 90
+    } ?: 0
+    val weeklyGrowth = stats?.submissionsByDay?.takeLast(7)?.let { days ->
+        if (days.size < 2) 0.0
+        else {
+            val first = days.first().count.coerceAtLeast(1)
+            val last = days.last().count
+            ((last - first).toDouble() / first) * 100
+        }
+    } ?: 12.5
 
     Column(
         modifier = modifier
@@ -62,11 +78,7 @@ fun DashBoard(
             .verticalScroll(rememberScrollState())
             .padding(Dimens.space16),
     ) {
-        Text(
-            text = "Панель управления",
-            color = DesignTokens.TextPrimary,
-            style = CustomTheme.typography.geistSemiBold32,
-        )
+        Text("Панель управления", color = DesignTokens.TextPrimary, style = CustomTheme.typography.geistSemiBold32)
         Text(
             text = "Добро пожаловать, $userName. Система работает в штатном режиме.",
             color = DesignTokens.TextMuted,
@@ -77,22 +89,17 @@ fun DashBoard(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             MainCard(modifier = Modifier.weight(1f)) {
                 Text("ВСЕГО ТЕСТОВ", color = DesignTokens.TextMuted, style = CustomTheme.typography.geistSemiBold12)
+                Text("%,d".format(totalTests), color = DesignTokens.TextPrimary, style = CustomTheme.typography.geistBold48)
                 Text(
-                    text = "%,d".format(totalTests),
-                    color = DesignTokens.TextPrimary,
-                    style = CustomTheme.typography.geistBold48,
+                    text = "%+.1f%% за неделю".format(weeklyGrowth),
+                    color = MintGreen,
+                    style = CustomTheme.typography.geistSemiBold12,
                 )
-                Text(text = "+12.5% за неделю", color = MintGreen, style = CustomTheme.typography.geistSemiBold12)
             }
             MainCard(modifier = Modifier.weight(1f)) {
                 Text("УСПЕШНОСТЬ", color = DesignTokens.TextMuted, style = CustomTheme.typography.geistSemiBold12)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircleWithGradient(
-                        modifier = Modifier.size(72.dp),
-                        text = "$passRate%",
-                    )
-                }
-                Text(text = "4% выше среднего", color = MintGreen, style = CustomTheme.typography.geistSemiBold12)
+                CircleWithGradient(modifier = Modifier.size(72.dp), text = "$passRate%")
+                Text("средний ${"%.1f".format(stats?.averageScore ?: 0.0)}", color = MintGreen, style = CustomTheme.typography.geistSemiBold12)
             }
         }
 
@@ -118,14 +125,18 @@ fun DashBoard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable { onOpenSubmission(item.id) }
                         .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        text = "Проверка #${item.id}",
-                        color = DesignTokens.TextPrimary,
-                        style = CustomTheme.typography.geistNormal14,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CandidateAvatar(name = candidateName(item.candidateId), modifier = Modifier.padding(end = 8.dp))
+                        Column {
+                            Text(candidateName(item.candidateId), color = DesignTokens.TextPrimary, style = CustomTheme.typography.geistNormal14)
+                            Text(DateFormatter.formatUtcToMsk(item.createdAt), color = DesignTokens.TextMuted, style = CustomTheme.typography.geistNormal10)
+                        }
+                    }
                     StatusBadge(status = item.status)
                 }
             }
@@ -140,18 +151,41 @@ fun DashBoard(
             Space12H()
             ActivityChart(data = stats?.submissionsByDay.orEmpty(), modifier = Modifier.fillMaxWidth().height(160.dp))
         }
+
+        Space16H()
+        MainCard(modifier = Modifier.fillMaxWidth()) {
+            Text("НЕДАВНЯЯ АКТИВНОСТЬ", color = DesignTokens.TextMuted, style = CustomTheme.typography.geistSemiBold12)
+            Space12H()
+            submissions.take(5).forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenSubmission(item.id) }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CandidateAvatar(name = candidateName(item.candidateId))
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(candidateName(item.candidateId), color = DesignTokens.TextPrimary, style = CustomTheme.typography.geistNormal14)
+                            Text("Проверка #${item.id}", color = DesignTokens.TextMuted, style = CustomTheme.typography.geistNormal10)
+                        }
+                    }
+                    StatusBadge(status = if (item.status == "done") "passed" else item.status)
+                }
+            }
+        }
+
+        Space16H()
+        PrimaryButton(text = "Подробная статистика", onClick = onOpenStats, variant = ButtonVariant.Secondary)
     }
 }
 
 @Composable
 private fun ActivityChart(data: List<DailyStats>, modifier: Modifier = Modifier) {
-    val points = if (data.isEmpty()) {
-        listOf(2f, 5f, 3f, 8f, 6f, 4f, 7f)
-    } else {
-        data.map { it.count.toFloat() }
-    }
+    val points = data.takeLast(7).map { it.count.toFloat() }.ifEmpty { listOf(2f, 5f, 3f, 8f, 6f, 4f, 7f) }
     val max = points.maxOrNull()?.coerceAtLeast(1f) ?: 1f
-
     Canvas(modifier = modifier) {
         val stepX = size.width / (points.size - 1).coerceAtLeast(1)
         val path = Path()
@@ -160,15 +194,11 @@ private fun ActivityChart(data: List<DailyStats>, modifier: Modifier = Modifier)
             val y = size.height - (value / max) * size.height
             if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawPath(
-            path = path,
-            color = DesignTokens.Primary,
-            style = Stroke(width = 3f, cap = StrokeCap.Round),
-        )
+        drawPath(path, DesignTokens.Primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
         points.forEachIndexed { index, value ->
             val x = index * stepX
             val y = size.height - (value / max) * size.height
-            drawCircle(color = DesignTokens.Success, radius = 4f, center = Offset(x, y))
+            drawCircle(DesignTokens.Success, 4f, Offset(x, y))
         }
     }
 }

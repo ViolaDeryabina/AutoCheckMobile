@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.autocheckmobile.data.remote.SubmissionEventClient
 import com.example.autocheckmobile.domain.usecase.submission.CreateSubmissionWithGitUseCase
 import com.example.autocheckmobile.domain.usecase.submission.CreateSubmissionWithZipUseCase
 import com.example.netlib.data.result.NetworkResult
@@ -24,10 +25,11 @@ data class UploadUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val successSubmissionId: Int? = null,
+    val trackingStatus: String? = null,
 )
 
 /**
- * Назначение: загрузка решения кандидата (ZIP или Git URL) на сервер.
+ * Назначение: загрузка решения кандидата с SSE-отслеживанием статуса.
  * Дата создания: 31-05-2026
  * Автор создания: Команда AutoCheck
  */
@@ -36,18 +38,15 @@ class UploadViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val zipUseCase: CreateSubmissionWithZipUseCase,
     private val gitUseCase: CreateSubmissionWithGitUseCase,
+    private val eventClient: SubmissionEventClient,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UploadUiState())
     val state: StateFlow<UploadUiState> = _state.asStateFlow()
 
-    /**
-     * Отправляет ZIP-архив решения на проверку.
-     */
     fun submitZip(token: String, assignmentId: Int, uri: Uri) {
         viewModelScope.launch {
             _state.value = UploadUiState(isLoading = true)
-            Log.i("[UploadViewModel]", "Загрузка ZIP — assignmentId=$assignmentId")
             val file = copyUriToCache(uri) ?: run {
                 _state.value = UploadUiState(errorMessage = "Не удалось прочитать файл")
                 return@launch
@@ -58,9 +57,8 @@ class UploadViewModel @Inject constructor(
             }
             when (val result = zipUseCase(token, assignmentId, file)) {
                 is NetworkResult.Success -> {
-                    val id = result.data.data?.id
-                    _state.value = UploadUiState(successSubmissionId = id)
-                    Log.i("[UploadViewModel]", "Успех — submissionId=$id")
+                    val id = result.data.data.id
+                    trackAfterSubmit(token, id)
                 }
                 is NetworkResult.Error -> _state.value = UploadUiState(errorMessage = result.message)
                 is NetworkResult.Exception -> _state.value = UploadUiState(errorMessage = result.message)
@@ -68,16 +66,11 @@ class UploadViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Отправляет Git URL решения на проверку.
-     */
     fun submitGit(token: String, assignmentId: Int, gitUrl: String) {
         viewModelScope.launch {
             _state.value = UploadUiState(isLoading = true)
             when (val result = gitUseCase(token, assignmentId, gitUrl)) {
-                is NetworkResult.Success -> {
-                    _state.value = UploadUiState(successSubmissionId = result.data.data?.id)
-                }
+                is NetworkResult.Success -> trackAfterSubmit(token, result.data.data.id)
                 is NetworkResult.Error -> _state.value = UploadUiState(errorMessage = result.message)
                 is NetworkResult.Exception -> _state.value = UploadUiState(errorMessage = result.message)
             }
@@ -86,6 +79,16 @@ class UploadViewModel @Inject constructor(
 
     fun resetState() {
         _state.value = UploadUiState()
+    }
+
+    private suspend fun trackAfterSubmit(token: String, submissionId: Int) {
+        _state.value = UploadUiState(isLoading = true, successSubmissionId = submissionId, trackingStatus = "pending")
+        val sseOk = eventClient.trackUntilDone(token, submissionId) { status ->
+            _state.value = _state.value.copy(trackingStatus = status)
+        }
+        if (!sseOk) Log.i("[UploadViewModel]", "SSE fallback — submissionId=$submissionId")
+        _state.value = _state.value.copy(isLoading = false, trackingStatus = "done")
+        Log.i("[UploadViewModel]", "Отправка завершена — submissionId=$submissionId")
     }
 
     private suspend fun copyUriToCache(uri: Uri): File? = withContext(Dispatchers.IO) {

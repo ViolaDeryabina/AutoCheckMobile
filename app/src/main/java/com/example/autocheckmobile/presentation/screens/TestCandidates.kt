@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.autocheckmobile.presentation.components.CandidateAvatar
 import com.example.autocheckmobile.presentation.components.FilterChip
 import com.example.autocheckmobile.presentation.components.MainCard
 import com.example.autocheckmobile.presentation.components.StatusBadge
@@ -44,6 +45,7 @@ import com.example.netlib.data.dto.sub.SubmissionItem
 fun TestCandidates(
     submissions: List<SubmissionItem>,
     assignmentTitle: (Int) -> String,
+    candidateName: (Int) -> String,
     onSelectSubmission: (SubmissionItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -120,9 +122,14 @@ fun TestCandidates(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        CandidateAvatar(name = candidateName(item.candidateId))
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = Dimens.space12),
+                        ) {
                             Text(
-                                text = "Кандидат #${item.candidateId}",
+                                text = candidateName(item.candidateId),
                                 color = DesignTokens.TextPrimary,
                                 style = CustomTheme.typography.geistBold14,
                             )

@@ -4,18 +4,20 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autocheckmobile.data.local.SessionStorage
+import com.example.autocheckmobile.data.remote.SubmissionEventClient
 import com.example.autocheckmobile.domain.usecase.assignment.GetAssignmentsUseCase
 import com.example.autocheckmobile.domain.usecase.auth.GetProfileUseCase
 import com.example.autocheckmobile.domain.usecase.auth.LoginUseCase
 import com.example.autocheckmobile.domain.usecase.auth.LogoutUseCase
 import com.example.autocheckmobile.domain.usecase.auth.RegisterUseCase
+import com.example.autocheckmobile.domain.usecase.candidate.GetCandidatesUseCase
 import com.example.autocheckmobile.domain.usecase.submission.GetSubmissionsUseCase
+import com.example.autocheckmobile.domain.GetStatsUseCase
 import com.example.netlib.data.dto.AssignmentItem
 import com.example.netlib.data.dto.ReportsStatsData
-import com.example.netlib.data.dto.sub.SubmissionItem
 import com.example.netlib.data.dto.RegisterRequest
+import com.example.netlib.data.dto.sub.SubmissionItem
 import com.example.netlib.data.result.NetworkResult
-import com.example.autocheckmobile.domain.GetStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,9 +39,12 @@ data class AppUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val successMessage: String? = null,
+    val toast: ToastEvent? = null,
     val assignments: List<AssignmentItem> = emptyList(),
     val submissions: List<SubmissionItem> = emptyList(),
     val stats: ReportsStatsData? = null,
+    val candidateNames: Map<Int, String> = emptyMap(),
+    val sessionExpired: Boolean = false,
 )
 
 /**
@@ -57,6 +62,7 @@ class SessionViewModel @Inject constructor(
     private val getAssignmentsUseCase: GetAssignmentsUseCase,
     private val getSubmissionsUseCase: GetSubmissionsUseCase,
     private val getStatsUseCase: GetStatsUseCase,
+    private val getCandidatesUseCase: GetCandidatesUseCase,
 ) : ViewModel() {
 
     private val _session = MutableStateFlow<UserSession?>(null)
@@ -81,48 +87,34 @@ class SessionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Выполняет вход по email и паролю, сохраняет JWT-токен.
-     */
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             when (val result = loginUseCase(email, password)) {
                 is NetworkResult.Success -> {
-                    val auth = result.data.data ?: run {
-                        setError("Пустой ответ сервера")
-                        return@launch
-                    }
+                    val auth = result.data.data
                     persistAuth(auth.accessToken, auth.user.id, auth.user.email, auth.user.fullName, auth.user.role)
                     Log.i("[SessionViewModel]", "Вход успешен — userId=${auth.user.id}")
                     loadCollections(auth.accessToken)
-                    _uiState.value = _uiState.value.copy(isLoading = false, successMessage = "Успешный вход")
+                    showToast("Успешный вход")
                 }
-                is NetworkResult.Error -> setError(mapError(result.status, result.message.orEmpty()))
-                is NetworkResult.Exception -> setError(result.message.orEmpty().ifBlank { "Ошибка сети" })
+                is NetworkResult.Error -> handleError(result.status, result.message.orEmpty())
+                is NetworkResult.Exception -> handleError(null, result.message.orEmpty().ifBlank { "Ошибка сети" })
             }
         }
     }
 
-    /**
-     * Регистрирует нового кандидата и выполняет автоматический вход.
-     */
     fun register(fullName: String, email: String, password: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             when (val result = registerUseCase(RegisterRequest(fullName, email, password, "candidate"))) {
-                is NetworkResult.Success -> {
-                    login(email, password)
-                }
-                is NetworkResult.Error -> setError(mapError(result.status, result.message.orEmpty()))
-                is NetworkResult.Exception -> setError(result.message.orEmpty().ifBlank { "Ошибка сети" })
+                is NetworkResult.Success -> login(email, password)
+                is NetworkResult.Error -> handleError(result.status, result.message.orEmpty())
+                is NetworkResult.Exception -> handleError(null, result.message.orEmpty().ifBlank { "Ошибка сети" })
             }
         }
     }
 
-    /**
-     * Выход из системы с очисткой локальной сессии.
-     */
     fun logout() {
         val token = _session.value?.token ?: return
         viewModelScope.launch {
@@ -134,17 +126,24 @@ class SessionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Загружает задания, проверки и статистику для текущего пользователя.
-     */
     fun refreshData() {
         val token = _session.value?.token ?: return
         loadCollections(token)
     }
 
     fun clearMessages() {
-        _uiState.value = _uiState.value.copy(errorMessage = null, successMessage = null)
+        _uiState.value = _uiState.value.copy(errorMessage = null, successMessage = null, toast = null)
     }
+
+    fun consumeToast() {
+        _uiState.value = _uiState.value.copy(toast = null)
+    }
+
+    fun clearSessionExpired() {
+        _uiState.value = _uiState.value.copy(sessionExpired = false)
+    }
+
+    fun candidateName(id: Int): String = _uiState.value.candidateNames[id] ?: "Кандидат #$id"
 
     fun assignmentTitle(id: Int): String =
         _uiState.value.assignments.find { it.id == id }?.title ?: "Задание #$id"
@@ -152,12 +151,17 @@ class SessionViewModel @Inject constructor(
     private suspend fun restoreSession(token: String) {
         when (val result = getProfileUseCase(token)) {
             is NetworkResult.Success -> {
-                val user = result.data.data ?: return
+                val user = result.data.data
                 _session.value = UserSession(token, user.id, user.email, user.fullName, user.role)
                 loadCollections(token)
             }
             is NetworkResult.Error -> {
-                if (result.status == 401) sessionStorage.clearSession()
+                if (result.status == 401) {
+                    sessionStorage.clearSession()
+                    _session.value = null
+                    _uiState.value = _uiState.value.copy(sessionExpired = true)
+                    showToast("Сессия истекла, войдите снова", isError = true)
+                }
             }
             is NetworkResult.Exception -> Unit
         }
@@ -171,37 +175,62 @@ class SessionViewModel @Inject constructor(
     private fun loadCollections(token: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
+            var unauthorized = false
+
             val assignments = when (val r = getAssignmentsUseCase(token)) {
-                is NetworkResult.Success -> r.data.data?.items.orEmpty()
+                is NetworkResult.Success -> r.data.data.items
+                is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; emptyList() }
                 else -> emptyList()
             }
             val submissions = when (val r = getSubmissionsUseCase(token)) {
-                is NetworkResult.Success -> r.data.data?.items.orEmpty()
+                is NetworkResult.Success -> r.data.data.items
+                is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; emptyList() }
                 else -> emptyList()
             }
             val stats = when (val r = getStatsUseCase(token)) {
                 is NetworkResult.Success -> r.data.data
+                is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; null }
                 else -> null
             }
+            val candidateNames = when (val r = getCandidatesUseCase(token)) {
+                is NetworkResult.Success -> r.data.data.items.associate { it.id to it.fullName }
+                else -> emptyMap()
+            }
+
+            if (unauthorized) {
+                sessionStorage.clearSession()
+                _session.value = null
+                _uiState.value = AppUiState(sessionExpired = true, toast = ToastEvent("Сессия истекла", isError = true))
+                return@launch
+            }
+
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 assignments = assignments,
                 submissions = submissions,
                 stats = stats,
+                candidateNames = candidateNames,
             )
         }
     }
 
-    private fun setError(message: String) {
-        Log.e("[SessionViewModel]", "Ошибка — $message")
-        _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = message)
+    private fun showToast(message: String, isError: Boolean = false) {
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            toast = ToastEvent(message, isError),
+            errorMessage = if (isError) message else null,
+        )
     }
 
-    private fun mapError(status: Int, message: String): String = when (status) {
-        401 -> "Неверный email или пароль"
-        403 -> "Недостаточно прав"
-        422 -> "Ошибка валидации данных"
-        in 500..599 -> "Серверная ошибка"
-        else -> message
+    private fun handleError(status: Int?, message: String) {
+        val mapped = when (status) {
+            401 -> "Неверный email или пароль"
+            403 -> "Недостаточно прав"
+            422 -> "Ошибка валидации данных"
+            in 500..599 -> "Серверная ошибка"
+            else -> message.ifBlank { "Ошибка запроса" }
+        }
+        Log.e("[SessionViewModel]", "Ошибка — $mapped")
+        showToast(mapped, isError = true)
     }
 }

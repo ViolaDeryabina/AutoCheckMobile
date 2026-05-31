@@ -51,6 +51,7 @@ dependencies {
     api(libs.converter.gson)
     implementation(libs.kotlinx.coroutines.android)
     api(libs.logging.interceptor)
+    implementation("com.squareup.okhttp3:okhttp:5.3.2")
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(platform(libs.androidx.compose.bom))

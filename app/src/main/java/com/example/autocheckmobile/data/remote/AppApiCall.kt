@@ -7,11 +7,12 @@ import com.example.netlib.data.result.NetworkResult
 
 internal fun mapCheckerResults(data: SubmissionResultsApiData?): List<CheckerResult> =
     data?.items.orEmpty().map { item ->
+        val detailsText = item.details.toDetailText().ifBlank { item.message.orEmpty() }
         CheckerResult(
             name = item.checker.orEmpty().ifBlank { "Checker" },
             score = item.score ?: 0,
             maxScore = 100,
-            details = item.details ?: item.message.orEmpty(),
+            details = detailsText,
         )
     }
 

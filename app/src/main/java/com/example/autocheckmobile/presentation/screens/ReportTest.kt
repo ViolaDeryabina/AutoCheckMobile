@@ -199,7 +199,11 @@ fun ReportTest(
             Space12H()
             when {
                 state.aiReview != null -> {
-                    Text(state.aiReview.review, color = DesignTokens.TextMuted, style = CustomTheme.typography.geistNormal14)
+                    Text(
+                        state.aiReview.review.orEmpty().ifBlank { "AI-анализ получен" },
+                        color = DesignTokens.TextMuted,
+                        style = CustomTheme.typography.geistNormal14,
+                    )
                     state.aiReview.suggestions.orEmpty().forEach { tip ->
                         Text("• $tip", color = DesignTokens.TextMuted, style = CustomTheme.typography.geistNormal14)
                     }
@@ -235,9 +239,9 @@ fun ReportTest(
         Space16H()
         MainCard(modifier = Modifier.fillMaxWidth()) {
             Text("Хронология", color = DesignTokens.TextPrimary, style = CustomTheme.typography.geistBold14)
-            TimelineRow("Загрузка", DateFormatter.formatUtcToMsk(submission.createdAt))
-            TimelineRow("Обновление", DateFormatter.formatUtcToMsk(submission.updatedAt))
-            TimelineRow("Статус", submission.status)
+            TimelineRow("Загрузка", DateFormatter.formatUtcToMsk(submission.createdAt.orEmpty()))
+            TimelineRow("Обновление", DateFormatter.formatUtcToMsk(submission.updatedAt.orEmpty()))
+            TimelineRow("Статус", submission.status.orEmpty())
             TimelineRow("Вердикт", submission.verdict ?: "pending")
         }
 

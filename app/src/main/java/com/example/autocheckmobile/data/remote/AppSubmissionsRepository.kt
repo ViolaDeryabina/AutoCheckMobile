@@ -106,8 +106,24 @@ class AppSubmissionsRepository @Inject constructor(
     suspend fun getAiReview(
         token: String,
         submissionId: Int,
-    ): NetworkResult<ApiResponse<AiReviewResponse>> =
-        safeApiCall { api.getAiReview(bearerToken(token), submissionId) }
+    ): NetworkResult<ApiResponse<AiReviewResponse>> = safeApiCall {
+        val response = api.getAiReview(bearerToken(token), submissionId)
+        val raw = response.data
+        val suggestions = buildList {
+            raw?.strengths.orEmpty().forEach { add(it) }
+            raw?.improvements.orEmpty().forEach { add(it) }
+        }
+        ApiResponse(
+            data = AiReviewResponse(
+                submissionId = submissionId,
+                review = raw?.summary.orEmpty(),
+                suggestions = suggestions,
+                score = null,
+            ),
+            error = response.error,
+            meta = response.meta,
+        )
+    }
 
     private fun textPlain() = "text/plain".toMediaTypeOrNull()
 }

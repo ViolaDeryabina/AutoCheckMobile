@@ -67,6 +67,17 @@ fun AppNavHost(
         onConsumed = sessionViewModel::consumeToast,
     )
 
+    LaunchedEffect(session) {
+        if (session == null) {
+            val route = navController.currentDestination?.route
+            if (route != null && route != AppRoutes.AUTH) {
+                navController.navigate(AppRoutes.AUTH) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
+    }
+
     LaunchedEffect(uiState.sessionExpired) {
         if (uiState.sessionExpired) {
             navController.navigate(AppRoutes.AUTH) {
@@ -102,12 +113,7 @@ fun AppNavHost(
                 snackbarHostState = snackbarHostState,
                 candidateName = sessionViewModel::candidateName,
                 assignmentTitle = sessionViewModel::assignmentTitle,
-                onLogout = {
-                    sessionViewModel.logout()
-                    navController.navigate(AppRoutes.AUTH) {
-                        popUpTo(AppRoutes.MAIN) { inclusive = true }
-                    }
-                },
+                onLogout = sessionViewModel::logout,
                 onOpenSubmission = { id ->
                     navController.navigate(AppRoutes.submissionDetails(id))
                 },
@@ -161,7 +167,10 @@ fun AppNavHost(
                     onDownloadReport = { detailsViewModel.downloadReport(currentSession.token, submissionId) },
                     onApprove = { detailsViewModel.setVerdict(currentSession.token, submissionId, "approved") },
                     onReject = { detailsViewModel.setVerdict(currentSession.token, submissionId, "rejected") },
-                    onBack = { navController.popBackStack() },
+                    onBack = {
+                        sessionViewModel.refreshData()
+                        navController.popBackStack()
+                    },
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -188,12 +197,12 @@ private fun MainShell(
     var showStats by remember { mutableStateOf(false) }
     val uploadState by uploadViewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(uploadState.successSubmissionId) {
-        if (uploadState.successSubmissionId != null && !uploadState.isLoading) {
-            onShowToast("Решение отправлено · статус: ${uploadState.trackingStatus ?: "pending"}", false)
-            uploadViewModel.resetState()
-            selectedTab = 0
+    LaunchedEffect(uploadState.successSubmissionId, uploadState.isLoading) {
+        val submissionId = uploadState.successSubmissionId
+        if (submissionId != null && !uploadState.isLoading) {
             onRefresh()
+            onOpenSubmission(submissionId)
+            uploadViewModel.resetState()
         }
     }
 

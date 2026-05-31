@@ -1,31 +1,46 @@
 package com.example.autocheckmobile.data.remote
 
-import android.util.Log
+import com.example.netlib.data.dto.ApiResponse
+import com.example.netlib.data.dto.sub.CheckerResult
+import com.example.netlib.data.dto.sub.SubmissionResultsResponse
 import com.example.netlib.data.result.NetworkResult
-import com.google.gson.Gson
-import com.google.gson.JsonObject
-import retrofit2.HttpException
 
-private val gson = Gson()
+internal fun mapCheckerResults(data: SubmissionResultsApiData?): List<CheckerResult> =
+    data?.items.orEmpty().map { item ->
+        CheckerResult(
+            name = item.checker.orEmpty().ifBlank { "Checker" },
+            score = item.score ?: 0,
+            maxScore = 100,
+            details = item.details ?: item.message.orEmpty(),
+        )
+    }
+
+internal fun wrapResults(
+    submissionId: Int,
+    data: SubmissionResultsApiData?,
+): SubmissionResultsResponse = SubmissionResultsResponse(
+    submissionId = submissionId,
+    results = mapCheckerResults(data),
+)
 
 internal suspend fun <T> safeApiCall(block: suspend () -> T): NetworkResult<T> {
     return try {
         NetworkResult.Success(block())
-    } catch (error: HttpException) {
+    } catch (error: retrofit2.HttpException) {
         val message = parseErrorMessage(error)
-        Log.e("[AppApiCall]", "HTTP ${error.code()} — $message")
+        android.util.Log.e("[AppApiCall]", "HTTP ${error.code()} — $message")
         NetworkResult.Error(error.code(), message)
     } catch (error: Exception) {
-        Log.e("[AppApiCall]", "Exception — ${error.message}")
+        android.util.Log.e("[AppApiCall]", "Exception — ${error.message}")
         NetworkResult.Exception(error.message ?: "Ошибка сети")
     }
 }
 
-private fun parseErrorMessage(error: HttpException): String {
+private fun parseErrorMessage(error: retrofit2.HttpException): String {
     val raw = error.response()?.errorBody()?.string().orEmpty()
     if (raw.isBlank()) return error.message().orEmpty().ifBlank { "HTTP ${error.code()}" }
     return runCatching {
-        val root = gson.fromJson(raw, JsonObject::class.java)
+        val root = com.google.gson.Gson().fromJson(raw, com.google.gson.JsonObject::class.java)
         root.getAsJsonObject("error")?.get("message")?.asString
             ?: root.get("detail")?.asString
             ?: root.get("message")?.asString

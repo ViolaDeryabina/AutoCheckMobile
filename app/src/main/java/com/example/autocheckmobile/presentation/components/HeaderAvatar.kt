@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -47,6 +48,8 @@ fun HeaderAvatar(
     Log.i("[HeaderAvatar]", "Создание - Отрисовка HeaderAvatar")
     Row(
         modifier = modifier
+            .statusBarsPadding()
+            .fillMaxWidth()
             .background(DarkBlue.copy(0.8f))
             .padding(Dimens.space16),
         verticalAlignment = Alignment.CenterVertically,

@@ -19,10 +19,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.compose.ui.Modifier
 import com.example.autocheckmobile.presentation.components.FilterChip
 import com.example.autocheckmobile.presentation.components.FormInput
@@ -44,21 +47,32 @@ import com.example.netlib.data.dto.AssignmentItem
 fun UploadScreen(
     assignments: List<AssignmentItem>,
     isLoading: Boolean,
+    trackingStatus: String? = null,
     onSubmitZip: (assignmentId: Int, uri: Uri) -> Unit,
     onSubmitGit: (assignmentId: Int, gitUrl: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var mode by rememberSaveable { mutableStateOf("zip") }
     var expanded by rememberSaveable { mutableStateOf(false) }
-    var selectedAssignment by rememberSaveable { mutableStateOf<AssignmentItem?>(assignments.firstOrNull()) }
+    var selectedAssignmentId by rememberSaveable { mutableIntStateOf(-1) }
     var gitUrl by rememberSaveable { mutableStateOf("") }
     var zipName by rememberSaveable { mutableStateOf<String?>(null) }
-    var zipUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var zipUriString by rememberSaveable { mutableStateOf<String?>(null) }
+    val zipUri = zipUriString?.toUri()
+
+    LaunchedEffect(assignments) {
+        if (selectedAssignmentId <= 0 && assignments.isNotEmpty()) {
+            selectedAssignmentId = assignments.first().id
+        }
+    }
+
+    val selectedAssignment = assignments.find { it.id == selectedAssignmentId }
+        ?: assignments.firstOrNull()
     Log.i("[UploadScreen]", "Отрисовка — assignments=${assignments.size}")
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            zipUri = uri
+            zipUriString = uri.toString()
             zipName = uri.lastPathSegment ?: "solution.zip"
         }
     }
@@ -107,7 +121,7 @@ fun UploadScreen(
                     DropdownMenuItem(
                         text = { Text(item.title) },
                         onClick = {
-                            selectedAssignment = item
+                            selectedAssignmentId = item.id
                             expanded = false
                         },
                     )
@@ -149,6 +163,14 @@ fun UploadScreen(
         }
 
         Space16H()
+        if (trackingStatus != null) {
+            Text(
+                text = "Статус проверки: $trackingStatus",
+                color = DesignTokens.Primary,
+                style = CustomTheme.typography.geistNormal14,
+            )
+            Space12H()
+        }
         PrimaryButton(
             text = "Отправить на проверку",
             onClick = {

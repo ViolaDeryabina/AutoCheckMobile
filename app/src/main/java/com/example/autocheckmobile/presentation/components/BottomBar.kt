@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -47,6 +48,8 @@ fun BottomBar(
     Log.i("[BottomBar]", "Создание - Отрисовка BottomBar selected=$selected")
     Row(
         modifier = modifier
+            .navigationBarsPadding()
+            .fillMaxWidth()
             .background(Back, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .border(1.dp, White.copy(0.08f), RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .padding(14.dp),

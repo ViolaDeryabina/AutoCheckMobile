@@ -108,7 +108,13 @@ class SessionViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             when (val result = registerUseCase(RegisterRequest(fullName, email, password, "candidate"))) {
-                is NetworkResult.Success -> login(email, password)
+                is NetworkResult.Success -> {
+                    val auth = result.data.data
+                    persistAuth(auth.accessToken, auth.user.id, auth.user.email, auth.user.fullName, auth.user.role)
+                    Log.i("[SessionViewModel]", "Регистрация успешна — userId=${auth.user.id}")
+                    loadCollections(auth.accessToken)
+                    showToast("Регистрация успешна")
+                }
                 is NetworkResult.Error -> handleError(result.status, result.message.orEmpty())
                 is NetworkResult.Exception -> handleError(null, result.message.orEmpty().ifBlank { "Ошибка сети" })
             }
@@ -157,10 +163,13 @@ class SessionViewModel @Inject constructor(
             }
             is NetworkResult.Error -> {
                 if (result.status == 401) {
+                    val hadActiveSession = _session.value != null
                     sessionStorage.clearSession()
                     _session.value = null
-                    _uiState.value = _uiState.value.copy(sessionExpired = true)
-                    showToast("Сессия истекла, войдите снова", isError = true)
+                    if (hadActiveSession) {
+                        _uiState.value = _uiState.value.copy(sessionExpired = true)
+                        showToast("Сессия истекла, войдите снова", isError = true)
+                    }
                 }
             }
             is NetworkResult.Exception -> Unit
@@ -168,14 +177,15 @@ class SessionViewModel @Inject constructor(
     }
 
     private suspend fun persistAuth(token: String, userId: Int, email: String, fullName: String, role: String) {
-        sessionStorage.saveSession(token, userId, email, fullName, role)
         _session.value = UserSession(token, userId, email, fullName, role)
+        sessionStorage.saveSession(token, userId, email, fullName, role)
     }
 
     private fun loadCollections(token: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             var unauthorized = false
+            val isExpert = _session.value?.role in setOf("expert", "admin")
 
             val assignments = when (val r = getAssignmentsUseCase(token)) {
                 is NetworkResult.Success -> r.data.data.items
@@ -187,14 +197,22 @@ class SessionViewModel @Inject constructor(
                 is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; emptyList() }
                 else -> emptyList()
             }
-            val stats = when (val r = getStatsUseCase(token)) {
-                is NetworkResult.Success -> r.data.data
-                is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; null }
-                else -> null
+            val stats = if (isExpert) {
+                when (val r = getStatsUseCase(token)) {
+                    is NetworkResult.Success -> r.data.data
+                    is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; null }
+                    else -> null
+                }
+            } else {
+                null
             }
-            val candidateNames = when (val r = getCandidatesUseCase(token)) {
-                is NetworkResult.Success -> r.data.data.items.associate { it.id to it.fullName }
-                else -> emptyMap()
+            val candidateNames = if (isExpert) {
+                when (val r = getCandidatesUseCase(token)) {
+                    is NetworkResult.Success -> r.data.data.items.associate { it.id to it.fullName }
+                    else -> emptyMap()
+                }
+            } else {
+                emptyMap()
             }
 
             if (unauthorized) {
@@ -226,6 +244,7 @@ class SessionViewModel @Inject constructor(
         val mapped = when (status) {
             401 -> "Неверный email или пароль"
             403 -> "Недостаточно прав"
+            404 -> "Сервис недоступен (404). Проверьте адрес API"
             422 -> "Ошибка валидации данных"
             in 500..599 -> "Серверная ошибка"
             else -> message.ifBlank { "Ошибка запроса" }

@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp.android)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -40,6 +42,17 @@ android {
 }
 
 dependencies {
+    implementation(files("libs/net-lib-debug.aar"))
+    implementation(libs.androidx.runtime)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    api(libs.retrofit)
+    api(libs.converter.gson)
+    implementation(libs.kotlinx.coroutines.android)
+    api(libs.logging.interceptor)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.android.compiler)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

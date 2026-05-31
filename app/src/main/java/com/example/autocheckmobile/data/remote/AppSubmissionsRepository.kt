@@ -70,8 +70,14 @@ class AppSubmissionsRepository @Inject constructor(
     suspend fun getSubmissionResults(
         token: String,
         submissionId: Int,
-    ): NetworkResult<ApiResponse<SubmissionResultsResponse>> =
-        safeApiCall { api.getSubmissionResults(bearerToken(token), submissionId) }
+    ): NetworkResult<ApiResponse<SubmissionResultsResponse>> = safeApiCall {
+        val response = api.getSubmissionResults(bearerToken(token), submissionId)
+        ApiResponse(
+            data = wrapResults(submissionId, response.data),
+            error = response.error,
+            meta = response.meta,
+        )
+    }
 
     suspend fun rerunSubmission(
         token: String,

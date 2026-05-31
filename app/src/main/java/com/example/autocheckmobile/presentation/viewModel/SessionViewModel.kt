@@ -188,12 +188,12 @@ class SessionViewModel @Inject constructor(
             val isExpert = _session.value?.role in setOf("expert", "admin")
 
             val assignments = when (val r = getAssignmentsUseCase(token)) {
-                is NetworkResult.Success -> r.data.data.items
+                is NetworkResult.Success -> r.data.data.items.orEmpty()
                 is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; emptyList() }
                 else -> emptyList()
             }
             val submissions = when (val r = getSubmissionsUseCase(token)) {
-                is NetworkResult.Success -> r.data.data.items
+                is NetworkResult.Success -> r.data.data.items.orEmpty()
                 is NetworkResult.Error -> { if (r.status == 401) unauthorized = true; emptyList() }
                 else -> emptyList()
             }

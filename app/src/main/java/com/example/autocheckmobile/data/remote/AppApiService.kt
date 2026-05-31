@@ -6,7 +6,6 @@ import com.example.netlib.data.dto.CandidatesData
 import com.example.netlib.data.dto.ReportsStatsData
 import com.example.netlib.data.dto.sub.AiReviewResponse
 import com.example.netlib.data.dto.sub.SubmissionResponse
-import com.example.netlib.data.dto.sub.SubmissionResultsResponse
 import com.example.netlib.data.dto.sub.SubmissionStatusResponse
 import com.example.netlib.data.dto.sub.SubmissionsData
 import com.example.netlib.data.dto.sub.VerdictUpdateRequest
@@ -57,7 +56,7 @@ interface AppApiService {
     suspend fun getSubmissionResults(
         @Header("Authorization") token: String,
         @Path("submission_id") submissionId: Int,
-    ): ApiResponse<SubmissionResultsResponse>
+    ): ApiResponse<SubmissionResultsApiData>
 
     @POST("v1/submissions/{submission_id}/rerun")
     suspend fun rerunSubmission(

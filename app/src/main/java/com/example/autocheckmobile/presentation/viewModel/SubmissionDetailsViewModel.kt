@@ -60,8 +60,10 @@ class SubmissionDetailsViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(SubmissionDetailsState())
     val state: StateFlow<SubmissionDetailsState> = _state.asStateFlow()
+    private var activeSubmissionId: Int? = null
 
     fun load(token: String, submissionId: Int) {
+        activeSubmissionId = submissionId
         viewModelScope.launch {
             _state.value = SubmissionDetailsState(isLoading = true)
             fetchDetails(token, submissionId)
@@ -70,13 +72,20 @@ class SubmissionDetailsViewModel @Inject constructor(
     }
 
     fun loadAiReview(token: String, submissionId: Int) {
+        if (activeSubmissionId != submissionId) return
         viewModelScope.launch {
             when (val result = getAiReviewUseCase(token, submissionId)) {
                 is NetworkResult.Success -> {
                     val review = result.data.data
-                    _state.value = _state.value.copy(aiReview = review, aiUnavailable = review == null)
+                    if (activeSubmissionId == submissionId) {
+                        _state.value = _state.value.copy(aiReview = review, aiUnavailable = review == null)
+                    }
                 }
-                else -> _state.value = _state.value.copy(aiUnavailable = true)
+                else -> {
+                    if (activeSubmissionId == submissionId) {
+                        _state.value = _state.value.copy(aiUnavailable = true)
+                    }
+                }
             }
         }
     }
@@ -157,16 +166,27 @@ class SubmissionDetailsViewModel @Inject constructor(
         _state.value = _state.value.copy(errorMessage = null, successMessage = null, reportSavedPath = null)
     }
 
+    override fun onCleared() {
+        activeSubmissionId = null
+        super.onCleared()
+    }
+
     private suspend fun trackStatus(token: String, submissionId: Int) {
+        if (activeSubmissionId != submissionId) return
         val sseOk = eventClient.trackUntilDone(token, submissionId) { status ->
-            fetchDetails(token, submissionId)
+            if (activeSubmissionId == submissionId) {
+                fetchDetails(token, submissionId)
+            }
         }
+        if (activeSubmissionId != submissionId) return
         if (!sseOk) pollUntilDone(token, submissionId)
+        if (activeSubmissionId != submissionId) return
         fetchDetails(token, submissionId)
         loadAiReview(token, submissionId)
     }
 
     private suspend fun fetchDetails(token: String, submissionId: Int) {
+        if (activeSubmissionId != submissionId) return
         val submission = when (val r = getSubmissionUseCase(token, submissionId)) {
             is NetworkResult.Success -> r.data.data
             is NetworkResult.Error -> {
@@ -176,14 +196,16 @@ class SubmissionDetailsViewModel @Inject constructor(
             else -> null
         }
         val results = when (val r = getResultsUseCase(token, submissionId)) {
-            is NetworkResult.Success -> r.data.data.results
+            is NetworkResult.Success -> r.data.data.results.orEmpty()
             else -> emptyList()
         }
+        if (activeSubmissionId != submissionId) return
         _state.value = _state.value.copy(isLoading = false, submission = submission, results = results)
     }
 
     private suspend fun pollUntilDone(token: String, submissionId: Int) {
         repeat(75) {
+            if (activeSubmissionId != submissionId) return
             val status = when (val r = getStatusUseCase(token, submissionId)) {
                 is NetworkResult.Success -> r.data.data.status
                 else -> null

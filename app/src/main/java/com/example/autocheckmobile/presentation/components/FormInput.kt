@@ -54,12 +54,16 @@ fun FormInput(
                 .fillMaxWidth()
                 .border(
                     width = 1.dp,
-                    color = if (error != null) DesignTokens.Error else DesignTokens.Border,
+                    color = when {
+                        error != null -> DesignTokens.Error
+                        else -> DesignTokens.Border
+                    },
                     shape = RoundedCornerShape(DesignTokens.RadiusSm),
                 ),
             placeholder = {
                 Text(text = placeholder, color = DesignTokens.TextMuted)
             },
+            textStyle = CustomTheme.typography.geistNormal14.copy(color = DesignTokens.TextPrimary),
             enabled = enabled,
             isError = error != null,
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
@@ -67,11 +71,21 @@ fun FormInput(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = DesignTokens.TextPrimary,
                 unfocusedTextColor = DesignTokens.TextPrimary,
+                disabledTextColor = DesignTokens.TextMuted,
+                errorTextColor = DesignTokens.TextPrimary,
                 focusedContainerColor = DesignTokens.Card,
                 unfocusedContainerColor = DesignTokens.Card,
+                disabledContainerColor = DesignTokens.Card,
+                errorContainerColor = DesignTokens.Card,
                 cursorColor = DesignTokens.Primary,
-                focusedBorderColor = DesignTokens.Primary,
-                unfocusedBorderColor = DesignTokens.Border,
+                errorCursorColor = DesignTokens.Primary,
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                disabledBorderColor = Color.Transparent,
+                errorBorderColor = Color.Transparent,
+                focusedPlaceholderColor = DesignTokens.TextMuted,
+                unfocusedPlaceholderColor = DesignTokens.TextMuted,
+                errorPlaceholderColor = DesignTokens.TextMuted,
             ),
             shape = RoundedCornerShape(DesignTokens.RadiusSm),
             singleLine = true,
@@ -79,7 +93,7 @@ fun FormInput(
         if (error != null) {
             Text(
                 text = error,
-                color = Color(0xFFFECACA),
+                color = Color(0xFFFFB4AB),
                 style = CustomTheme.typography.geistNormal10,
                 modifier = Modifier.padding(top = 4.dp),
             )

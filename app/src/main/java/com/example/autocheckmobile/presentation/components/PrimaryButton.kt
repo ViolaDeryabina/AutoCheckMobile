@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.autocheckmobile.presentation.theme.CustomTheme
@@ -38,14 +39,19 @@ fun PrimaryButton(
         ButtonVariant.Primary -> ButtonDefaults.buttonColors(
             containerColor = DesignTokens.Primary,
             contentColor = Color.White,
-            disabledContainerColor = DesignTokens.Primary.copy(alpha = 0.5f),
+            disabledContainerColor = DesignTokens.Surface,
+            disabledContentColor = DesignTokens.TextMuted,
         )
         ButtonVariant.Secondary -> ButtonDefaults.outlinedButtonColors(
-            contentColor = DesignTokens.TextMuted,
+            contentColor = DesignTokens.TextPrimary,
+            disabledContentColor = DesignTokens.TextMuted,
+            containerColor = DesignTokens.Card.copy(alpha = 0.35f),
         )
         ButtonVariant.Danger -> ButtonDefaults.buttonColors(
-            containerColor = DesignTokens.Error.copy(alpha = 0.16f),
-            contentColor = Color(0xFFFECACA),
+            containerColor = DesignTokens.Error.copy(alpha = 0.24f),
+            contentColor = Color(0xFFFFB4AB),
+            disabledContainerColor = DesignTokens.Surface,
+            disabledContentColor = DesignTokens.TextMuted,
         )
     }
 
@@ -56,7 +62,9 @@ fun PrimaryButton(
             enabled = enabled && !loading,
             colors = colors,
             border = ButtonDefaults.outlinedButtonBorder.copy(
-                brush = androidx.compose.ui.graphics.SolidColor(DesignTokens.Border),
+                brush = androidx.compose.ui.graphics.SolidColor(
+                    if (enabled && !loading) DesignTokens.TextMuted else DesignTokens.Border,
+                ),
             ),
         ) {
             ButtonContent(text, loading)
@@ -76,18 +84,24 @@ fun PrimaryButton(
 
 @Composable
 private fun ButtonContent(text: String, loading: Boolean) {
+    val contentColor = LocalContentColor.current
     if (loading) {
         CircularProgressIndicator(
             modifier = Modifier.size(18.dp),
-            color = Color.White,
+            color = contentColor,
             strokeWidth = 2.dp,
         )
         Text(
             text = "  $text",
             style = CustomTheme.typography.geistBold14,
+            color = contentColor,
         )
     } else {
-        Text(text = text, style = CustomTheme.typography.geistBold14)
+        Text(
+            text = text,
+            style = CustomTheme.typography.geistBold14,
+            color = contentColor,
+        )
     }
 }
 

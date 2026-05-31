@@ -22,91 +22,62 @@ import androidx.compose.ui.unit.dp
 import com.example.autocheckmobile.R
 import com.example.autocheckmobile.presentation.theme.Back
 import com.example.autocheckmobile.presentation.theme.CustomTheme
+import com.example.autocheckmobile.presentation.theme.DesignTokens
 import com.example.autocheckmobile.presentation.theme.LightBlue
 import com.example.autocheckmobile.presentation.theme.SlateBlue
 import com.example.autocheckmobile.presentation.theme.White
 
-// Назначение:
-// Автор: Дерябина В.Н.
-// Дата создания: 30-05-2026
-
 data class BottomBarData(
     val icon: Int,
     val title: String,
-    val onClick: () -> Unit = {}
+    val onClick: () -> Unit = {},
 )
 
+/**
+ * Назначение: нижняя навигация приложения (Дашборд / Тесты / Настройки).
+ * Дата создания: 30-05-2026
+ * Автор создания: Дерябина В.Н.
+ */
 @Composable
 fun BottomBar(
     modifier: Modifier = Modifier,
-    data: List<BottomBarData> = listOf(
-        BottomBarData(
-            icon = R.drawable.dashboard,
-            title = "Дашборд"
-        ),
-        BottomBarData(
-            icon = R.drawable.dashboard,
-            title = "Дашборд"
-        ),
-        BottomBarData(
-            icon = R.drawable.dashboard,
-            title = "Дашборд"
-        ),
-    ),
-    selected: Int = 0
+    data: List<BottomBarData>,
+    selected: Int = 0,
 ) {
-    Log.i("[BottomBar]", "Создание - Отрисовка BottomBar")
+    Log.i("[BottomBar]", "Создание - Отрисовка BottomBar selected=$selected")
     Row(
         modifier = modifier
             .background(Back, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .border(1.dp, White.copy(0.08f), RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceAround
+        horizontalArrangement = Arrangement.SpaceAround,
     ) {
-        data.forEachIndexed { index, data ->
-            if (index == selected) {
-                Column(
-                    modifier = Modifier
-                        .background(SlateBlue.copy(0.5f), RoundedCornerShape(12.dp))
-                        .padding(7.2.dp)
-                        .clickable(
-                            onClick = data.onClick
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(data.icon),
-                        contentDescription = "",
-                        tint = LightBlue
+        data.forEachIndexed { index, item ->
+            val isSelected = index == selected
+            Column(
+                modifier = Modifier
+                    .then(
+                        if (isSelected) {
+                            Modifier.background(SlateBlue.copy(0.5f), RoundedCornerShape(12.dp))
+                        } else {
+                            Modifier
+                        },
                     )
-                    Text(
-                        text = data.title,
-                        color = LightBlue,
-                        style = CustomTheme.typography.geistSemiBold12
-                    )
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .padding(7.2.dp)
-                        .clickable(
-                            onClick = data.onClick
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(data.icon),
-                        contentDescription = "",
-                        tint = LightBlue.copy(0.6f),
-
-                        )
-                    Text(
-                        text = data.title,
-                        color = LightBlue.copy(0.6f),
-                        style = CustomTheme.typography.geistSemiBold12
-                    )
-                }
+                    .padding(7.2.dp)
+                    .clickable(onClick = item.onClick),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(item.icon),
+                    contentDescription = item.title,
+                    tint = if (isSelected) LightBlue else LightBlue.copy(0.6f),
+                )
+                Text(
+                    text = item.title,
+                    color = if (isSelected) LightBlue else LightBlue.copy(0.6f),
+                    style = CustomTheme.typography.geistSemiBold12,
+                )
             }
         }
     }
@@ -117,8 +88,12 @@ fun BottomBar(
 private fun BottomBarPreview() {
     CustomTheme {
         BottomBar(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            data = listOf(
+                BottomBarData(R.drawable.dashboard, "Дашборд"),
+                BottomBarData(R.drawable.file, "Тесты"),
+                BottomBarData(R.drawable.search, "Настройки"),
+            ),
         )
     }
 }
-
